@@ -71,6 +71,9 @@ namespace PowerplantApp.Services
 
             // also check that the sum of power does not exceed the original value
 
+            // cost efectiveness -> redifine as cost to produce 1 unit of energy, taking into account the availability of the fuel.
+            // check also if what is cheaper -> remove sum calculation cause it causes errors
+
             foreach (var pp in powerplantsByCostEffectiveness)
             {
                 var energyResult = new EnergyResult(pp.name, 0);
