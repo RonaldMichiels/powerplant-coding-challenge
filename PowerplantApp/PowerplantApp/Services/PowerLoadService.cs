@@ -102,7 +102,8 @@ namespace PowerplantApp.Services
             var powerSum = 0;
 
             var windPlants = sortedPowerplants.Where(powerplant => powerplant.type == "windturbine").ToList();
-            var fuelPlants = sortedPowerplants.Where(powerplant => powerplant.type == "gasfired" || powerplant.type == "turbojet").ToList();
+            var gasPlants = sortedPowerplants.Where(powerplant => powerplant.type == "gasfired").ToList();
+            var jetPlants = sortedPowerplants.Where(powerplant => powerplant.type == "turbojet").ToList();
 
             var result = new List<Powerplant>();
 
@@ -112,26 +113,60 @@ namespace PowerplantApp.Services
 
             // if sum > load -> check difference. Check if wind power
 
-            foreach (var powerplant in windPlants)
+            // the issue is ofcourse we need to match the load exactly at the lowest cost
+            // right now we take the max power, min power, remaing power or no power. We don't distribute the power evenly for example.
+
+            var gasPMinSum = gasPlants.Sum(gasPlant => gasPlant.pmin);
+            gasPlants.ForEach(gasplant => gasplant.pcurrent = gasplant.pmin);
+            remainingLoad = remainingLoad - gasPMinSum;
+
+            foreach (var powerplant in gasPlants)
             {
-                if (remainingLoad == 0 )
+                if (remainingLoad == 0)
                 {
                     break;
                 }
-                if (remainingLoad >= powerplant.pmax)
+                if (remainingLoad + powerplant.pmin > powerplant.pmax)
                 {
                     powerplant.pcurrent = powerplant.pmax;
-                    remainingLoad = remainingLoad - powerplant.pcurrent;
-                } else
+                    remainingLoad = (remainingLoad + powerplant.pmin) - powerplant.pcurrent;
+                }
+                else if (remainingLoad + powerplant.pmin <= powerplant.pmax)
                 {
-                    powerplant.pcurrent = remainingLoad;
-                    remainingLoad = remainingLoad - powerplant.pcurrent;
+                    powerplant.pcurrent = powerplant.pmin + remainingLoad;
+                    remainingLoad = 0;
                 }
                 powerSum += powerplant.pcurrent;
-
             }
 
-            foreach (var powerplant in fuelPlants)
+            // check if wind power
+            if (fuel.wind > 0)
+            {
+                foreach (var powerplant in windPlants)
+                {
+                    if (remainingLoad == 0)
+                    {
+                        break;
+                    }
+                    if (remainingLoad >= powerplant.pmax)
+                    {
+                        powerplant.pcurrent = powerplant.pmax;
+                        remainingLoad = remainingLoad - powerplant.pcurrent;
+                    }
+                    else
+                    {
+                        powerplant.pcurrent = remainingLoad;
+                        remainingLoad = remainingLoad - powerplant.pcurrent;
+                    }
+                    powerSum += powerplant.pcurrent;
+
+                }
+            }
+
+            // check if we can replace fossil power with wind power
+            // is all windpower used ?
+
+            foreach (var powerplant in jetPlants)
             {
                 if (remainingLoad == 0)
                 {
@@ -142,11 +177,6 @@ namespace PowerplantApp.Services
                     powerplant.pcurrent = powerplant.pmax;
                     remainingLoad = remainingLoad - powerplant.pcurrent;
                 } 
-                else if (remainingLoad <= powerplant.pmin)
-                {
-                    powerplant.pcurrent = powerplant.pmin;
-                    remainingLoad = 0;
-                }
                 else
                 {
                     powerplant.pcurrent = remainingLoad;
@@ -158,7 +188,8 @@ namespace PowerplantApp.Services
             // check remaining load and sum
 
             result.AddRange(windPlants);
-            result.AddRange(fuelPlants);
+            result.AddRange(gasPlants);
+            result.AddRange(jetPlants);
             return result;
         }
 
