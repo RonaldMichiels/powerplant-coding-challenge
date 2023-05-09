@@ -42,8 +42,6 @@ namespace PowerplantApp.Services
 
         public static EnergyPlanResponse CalculatePower(EnergyPlanPayload payload)
         {
-            var remainingPower = payload.load;
-            var powerSum = 0;
 
             // loop over every powerplant
             // decide the type 
@@ -53,74 +51,14 @@ namespace PowerplantApp.Services
 
             // Cost Effectiveness = PMax Power * Efficiency / Cost in eur
 
-            foreach (var powerplant in payload.powerplants)
-            {
-                powerplant.pricePerUnitOfElectricity = CalculatePricePerUnitOfElectricty(powerplant, payload.fuels);
-            }
-
-            // sort the powerplants
-
-            var powerplantsByCostEffectiveness = payload.powerplants
-                .Select(powerplant =>
-                {
-                    if (powerplant.type == "windturbine")
-                    {
-                        powerplant.pmax = powerplant.pmax * (payload.fuels.wind / 100);
-                    }
-                    powerplant.minCost = powerplant.pmin * powerplant.pricePerUnitOfElectricity;
-                    powerplant.maxCost = powerplant.pmax * powerplant.pricePerUnitOfElectricity;
-                    return powerplant;
-                })
-                .OrderBy(powerplant => powerplant.pricePerUnitOfElectricity).ToList();
 
             // create report
 
+            var powerplants = FindOptimalDistribution(payload.powerplants, payload.load, payload.fuels);
+            var energyResults = powerplants.Select(powerplant => new EnergyResult(powerplant.name, powerplant.pcurrent)).ToList();
+
             var energyPlanResponse = new EnergyPlanResponse();
-
-            // Take into account pmin for powerstations as well.
-            // if pmin > remaining -> take pmin otherwise remaining
-
-            // also check that the sum of power does not exceed the original value
-
-            // cost efectiveness -> redifine as cost to produce 1 unit of energy, taking into account the availability of the fuel.
-            // check also if what is cheaper -> remove sum calculation cause it causes errors
-
-            foreach (var pp in powerplantsByCostEffectiveness)
-            {
-                var energyResult = new EnergyResult(pp.name, 0);
-                if (remainingPower > 0)
-                {
-                    var remainingPowerBackup = remainingPower;
-                    if (remainingPower > pp.pmax)
-                    {
-                        energyResult.p = pp.pmax;
-                        remainingPower = remainingPower - pp.pmax;
-
-                    } else if (remainingPower > pp.pmin)
-                    {
-                        energyResult.p = remainingPower;
-                        remainingPower = 0;
-                    } else
-                    {
-                        energyResult.p = pp.pmin;
-                        remainingPower = 0;
-                    }
-                    powerSum += energyResult.p;
-                    // check if sum exceeds max, if so, remove this one. Fallback is always turbojet.
-                    if (powerSum > payload.load)
-                    {
-                        powerSum -= energyResult.p;
-                        energyResult.p = 0;
-                        remainingPower = remainingPowerBackup;
-                    }
-                }
-                energyPlanResponse.EnergyResults.Add(energyResult);
-            }
-
-            // test
-
-
-
+            energyPlanResponse.EnergyResults = energyResults;
             return energyPlanResponse;
         }
 
@@ -144,6 +82,84 @@ namespace PowerplantApp.Services
                 pricePerUnitOfElectricity = (fuel.gas * 1.0f) / powerplant.efficiency;
             } 
             return pricePerUnitOfElectricity;
+        }
+
+        private static List<Powerplant> FindOptimalDistribution(List<Powerplant> powerplants, int load, Fuel fuel)
+        {
+            foreach (var powerplant in powerplants)
+            {
+                if (powerplant.type == "windturbine")
+                {
+                    powerplant.pmax = powerplant.pmax * (fuel.wind / 100);
+                    powerplant.typeCategory = 2;
+                }
+                powerplant.pricePerUnitOfElectricity = CalculatePricePerUnitOfElectricty(powerplant, fuel);
+            }
+
+            var sortedPowerplants = powerplants.OrderBy(powerplant => powerplant.pricePerUnitOfElectricity).ToList();
+
+            var remainingLoad = load;
+            var powerSum = 0;
+
+            var windPlants = sortedPowerplants.Where(powerplant => powerplant.type == "windturbine").ToList();
+            var fuelPlants = sortedPowerplants.Where(powerplant => powerplant.type == "gasfired" || powerplant.type == "turbojet").ToList();
+
+            var result = new List<Powerplant>();
+
+            // ask current cost (remaining power) of power stations -> lowest cost -> select if remaining power does not exceed pmin of remaining unused power stations
+            // pop power station
+            // for remaining power -> do the same
+
+            // if sum > load -> check difference. Check if wind power
+
+            foreach (var powerplant in windPlants)
+            {
+                if (remainingLoad == 0 )
+                {
+                    break;
+                }
+                if (remainingLoad >= powerplant.pmax)
+                {
+                    powerplant.pcurrent = powerplant.pmax;
+                    remainingLoad = remainingLoad - powerplant.pcurrent;
+                } else
+                {
+                    powerplant.pcurrent = remainingLoad;
+                    remainingLoad = remainingLoad - powerplant.pcurrent;
+                }
+                powerSum += powerplant.pcurrent;
+
+            }
+
+            foreach (var powerplant in fuelPlants)
+            {
+                if (remainingLoad == 0)
+                {
+                    break;
+                }
+                if (remainingLoad >= powerplant.pmax)
+                {
+                    powerplant.pcurrent = powerplant.pmax;
+                    remainingLoad = remainingLoad - powerplant.pcurrent;
+                } 
+                else if (remainingLoad <= powerplant.pmin)
+                {
+                    powerplant.pcurrent = powerplant.pmin;
+                    remainingLoad = 0;
+                }
+                else
+                {
+                    powerplant.pcurrent = remainingLoad;
+                    remainingLoad = remainingLoad - powerplant.pcurrent;
+                }
+                powerSum += powerplant.pcurrent;
+            }
+
+            // check remaining load and sum
+
+            result.AddRange(windPlants);
+            result.AddRange(fuelPlants);
+            return result;
         }
 
     }

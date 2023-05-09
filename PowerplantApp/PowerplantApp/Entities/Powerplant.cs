@@ -21,6 +21,8 @@
 
         public string type { get; set; }
 
+        public int typeCategory { get; set; }
+
         public float efficiency { get; set; }
 
         public int pmin { get; set; }
