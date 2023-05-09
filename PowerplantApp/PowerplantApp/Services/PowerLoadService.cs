@@ -90,7 +90,7 @@ namespace PowerplantApp.Services
             {
                 if (powerplant.type == "windturbine")
                 {
-                    powerplant.pmax = powerplant.pmax * (fuel.wind / 100);
+                    powerplant.pmax = (int)Math.Round(powerplant.pmax * ((fuel.wind * 1.0f) / 100));
                     powerplant.typeCategory = 2;
                 }
                 powerplant.pricePerUnitOfElectricity = CalculatePricePerUnitOfElectricty(powerplant, fuel);
@@ -116,24 +116,24 @@ namespace PowerplantApp.Services
             // the issue is ofcourse we need to match the load exactly at the lowest cost
             // right now we take the max power, min power, remaing power or no power. We don't distribute the power evenly for example.
 
-            var gasPMinSum = gasPlants.Sum(gasPlant => gasPlant.pmin);
-            gasPlants.ForEach(gasplant => gasplant.pcurrent = gasplant.pmin);
-            remainingLoad = remainingLoad - gasPMinSum;
-
             foreach (var powerplant in gasPlants)
             {
                 if (remainingLoad == 0)
                 {
                     break;
                 }
-                if (remainingLoad + powerplant.pmin > powerplant.pmax)
+                if (remainingLoad > powerplant.pmax)
                 {
                     powerplant.pcurrent = powerplant.pmax;
-                    remainingLoad = (remainingLoad + powerplant.pmin) - powerplant.pcurrent;
+                    remainingLoad = (remainingLoad) - powerplant.pcurrent;
                 }
-                else if (remainingLoad + powerplant.pmin <= powerplant.pmax)
+                else if (remainingLoad <= powerplant.pmax && remainingLoad >= powerplant.pmin)
                 {
-                    powerplant.pcurrent = powerplant.pmin + remainingLoad;
+                    powerplant.pcurrent = remainingLoad;
+                    remainingLoad = 0;
+                } else
+                {
+                    powerplant.pcurrent = powerplant.pmin;
                     remainingLoad = 0;
                 }
                 powerSum += powerplant.pcurrent;
@@ -165,6 +165,62 @@ namespace PowerplantApp.Services
 
             // check if we can replace fossil power with wind power
             // is all windpower used ?
+
+            var potentialWindPower = windPlants.Sum(powerplant => powerplant.pmax - powerplant.pcurrent);
+            var reallocatedWindPower = 0;
+
+            gasPlants.Reverse();
+
+            foreach (var powerplant in gasPlants)
+            {
+                if (powerplant.pcurrent > 0)
+                {
+                    if (potentialWindPower >= powerplant.pcurrent)
+                    {
+                        powerplant.pcurrent = 0;
+                        reallocatedWindPower += powerplant.pcurrent;
+                        potentialWindPower -= powerplant.pcurrent;
+                    } 
+                    else
+                    {
+                        powerplant.pcurrent = powerplant.pcurrent - potentialWindPower;
+                        if (powerplant.pcurrent < powerplant.pmin)
+                        {
+                            var difference = powerplant.pmin - powerplant.pcurrent;
+                            powerplant.pcurrent = powerplant.pmin;
+                            reallocatedWindPower = potentialWindPower - difference;
+                            potentialWindPower = difference;
+                        } else
+                        {
+                            reallocatedWindPower += potentialWindPower;
+                            potentialWindPower = 0;
+                        }
+                    }
+                }
+            }
+
+            gasPlants.Reverse();
+
+            // set windpower to max
+            foreach (var powerplant in windPlants)
+            {
+                if (reallocatedWindPower == 0)
+                {
+                    break;
+                }
+                if (reallocatedWindPower >= powerplant.pmax)
+                {
+                    powerplant.pcurrent = powerplant.pmax;
+                    reallocatedWindPower = reallocatedWindPower - powerplant.pcurrent;
+                }
+                else
+                {
+                    powerplant.pcurrent = reallocatedWindPower;
+                    reallocatedWindPower = reallocatedWindPower - powerplant.pcurrent;
+                }
+                powerSum += powerplant.pcurrent;
+
+            }
 
             foreach (var powerplant in jetPlants)
             {

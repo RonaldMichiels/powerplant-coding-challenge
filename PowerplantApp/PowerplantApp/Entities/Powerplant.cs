@@ -29,6 +29,8 @@
 
         public int pmax { get; set; }
 
+        public float effectifePmax { get; set; }
+
         public float pricePerUnitOfElectricity { get; set; }
 
         public int pcurrent { get; set; }
