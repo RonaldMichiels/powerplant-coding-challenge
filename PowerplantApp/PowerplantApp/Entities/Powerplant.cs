@@ -11,6 +11,10 @@
             this.pmin = pmin;
             this.pmax = pmax;
             this.pricePerUnitOfElectricity = 0;
+            this.pcurrent = 0;
+            this.minCost = 0;
+            this.maxCost = 0;
+            this.currentCost = 0;
         }
 
         public string name { get; set; }
@@ -24,5 +28,13 @@
         public int pmax { get; set; }
 
         public float pricePerUnitOfElectricity { get; set; }
+
+        public int pcurrent { get; set; }
+
+        public float minCost { get; set; }
+
+        public float maxCost { get; set; }
+
+        public float currentCost { get; set; }
     }
 }

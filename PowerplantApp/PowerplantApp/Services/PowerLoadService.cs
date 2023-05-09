@@ -67,6 +67,8 @@ namespace PowerplantApp.Services
                     {
                         powerplant.pmax = powerplant.pmax * (payload.fuels.wind / 100);
                     }
+                    powerplant.minCost = powerplant.pmin * powerplant.pricePerUnitOfElectricity;
+                    powerplant.maxCost = powerplant.pmax * powerplant.pricePerUnitOfElectricity;
                     return powerplant;
                 })
                 .OrderBy(powerplant => powerplant.pricePerUnitOfElectricity).ToList();
@@ -114,6 +116,11 @@ namespace PowerplantApp.Services
                 }
                 energyPlanResponse.EnergyResults.Add(energyResult);
             }
+
+            // test
+
+
+
             return energyPlanResponse;
         }
 
