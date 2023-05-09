@@ -20,7 +20,7 @@ namespace PowerplantApp.Controllers
             if(result != null)
             {
                 var energyPlanResponse = PowerLoadService.CalculatePower(result);
-                return JsonConvert.SerializeObject(energyPlanResponse);
+                return JsonConvert.SerializeObject(energyPlanResponse.EnergyResults);
             } else
             {
                 return "Invalid Input (Payload)";

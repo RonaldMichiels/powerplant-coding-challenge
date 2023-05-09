@@ -110,6 +110,12 @@ namespace PowerplantApp.Services
 
         private static float CalculateCostEffectiveness(Powerplant powerplant, Fuel fuel)
         {
+            // COST EFFECTIVENESS = price per unit of electricity
+            // take price 1UF (unit of fuel) * efficiency % = price per 1 UE (unit of electricity)
+            // price per unit of electricity is cost effectiveness
+            // rank order ascending (lowest price is better)
+            // BUT take into account pmin ?
+
             float costEffectivenessRating = 0;
             if (powerplant.type == "windturbine")
             {
