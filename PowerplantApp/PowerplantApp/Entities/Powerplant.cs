@@ -10,7 +10,7 @@
             this.efficiency = efficiency;
             this.pmin = pmin;
             this.pmax = pmax;
-            this.costEffectiveness = 0;
+            this.pricePerUnitOfElectricity = 0;
         }
 
         public string name { get; set; }
@@ -23,6 +23,6 @@
 
         public int pmax { get; set; }
 
-        public float costEffectiveness { get; set; }
+        public float pricePerUnitOfElectricity { get; set; }
     }
 }

@@ -55,12 +55,21 @@ namespace PowerplantApp.Services
 
             foreach (var powerplant in payload.powerplants)
             {
-                powerplant.costEffectiveness = CalculateCostEffectiveness(powerplant, payload.fuels);
+                powerplant.pricePerUnitOfElectricity = CalculatePricePerUnitOfElectricty(powerplant, payload.fuels);
             }
 
             // sort the powerplants
 
-            var powerplantsByCostEffectiveness = payload.powerplants.OrderBy(powerplant => powerplant.costEffectiveness).Reverse().ToList();
+            var powerplantsByCostEffectiveness = payload.powerplants
+                .Select(powerplant =>
+                {
+                    if (powerplant.type == "windturbine")
+                    {
+                        powerplant.pmax = powerplant.pmax * (payload.fuels.wind / 100);
+                    }
+                    return powerplant;
+                })
+                .OrderBy(powerplant => powerplant.pricePerUnitOfElectricity).ToList();
 
             // create report
 
@@ -108,28 +117,26 @@ namespace PowerplantApp.Services
             return energyPlanResponse;
         }
 
-        private static float CalculateCostEffectiveness(Powerplant powerplant, Fuel fuel)
+        private static float CalculatePricePerUnitOfElectricty(Powerplant powerplant, Fuel fuel)
         {
             // COST EFFECTIVENESS = price per unit of electricity
             // take price 1UF (unit of fuel) * efficiency % = price per 1 UE (unit of electricity)
+            // for wind -> cost is zero
             // price per unit of electricity is cost effectiveness
             // rank order ascending (lowest price is better)
-            // BUT take into account pmin ?
 
-            float costEffectivenessRating = 0;
-            if (powerplant.type == "windturbine")
+            // BUT take into account pmin ? -> in selection. Not here
+
+            float pricePerUnitOfElectricity = 0;
+            if (powerplant.type == "turbojet")
             {
-                costEffectivenessRating = powerplant.pmax * (fuel.wind * 1.0f / 100);
-            } else if (powerplant.type == "gasfired")
+                pricePerUnitOfElectricity = (fuel.kerosine * 1.0f) / powerplant.efficiency;
+            } 
+            else if (powerplant.type == "gasfired")
             {
-                var cost = fuel.gas / powerplant.efficiency;
-                costEffectivenessRating = (powerplant.pmax * 1.0f) / cost;
-            } else
-            {
-                var cost = fuel.kerosine / powerplant.efficiency;
-                costEffectivenessRating = (powerplant.pmax * 1.0f) / cost;
-            }
-            return costEffectivenessRating;
+                pricePerUnitOfElectricity = (fuel.gas * 1.0f) / powerplant.efficiency;
+            } 
+            return pricePerUnitOfElectricity;
         }
 
     }
